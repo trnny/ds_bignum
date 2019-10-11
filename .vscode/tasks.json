@@ -1,6 +1,4 @@
 {
-    // See https://go.microsoft.com/fwlink/?LinkId=733558
-    // for the documentation about the tasks.json format
     "version": "2.0.0",
     "tasks": [
         {
@@ -8,10 +6,31 @@
             "type": "shell",
             "command": "g++",
             "args": [
-                "-g", "${file}", 
+                "-g", 
+                "${file}", 
                 "-std=c++11", 
-                "-o", "${fileBasenameNoExtension}.out"
-            ]
+                "-o", 
+                "${workspaceFolder}/${fileBasenameNoExtension}.out"
+            ],   
         }
-    ]
+    ],
+    "problemMatcher": { 
+        "owner": "cpp",  
+        "fileLocation": [ 
+            "relative", 
+            "${workspaceRoot}" 
+        ], 
+        "pattern": { 
+            "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$", 
+            "file": 1, 
+            "line": 2, 
+            "column": 3, 
+            "severity": 4, 
+            "message": 5 
+        }    
+    },
+    "group": {
+        "kind": "build",
+        "isDefault": true
+    }
 }

@@ -20,27 +20,19 @@ static bool _isnumstr(const string& num){       // 判断输入的字符串和�
     return true;
 }
 
-/* 
-static int _getvi64mlen(int64_t num){   // 该函数可以被上面函数取代
-    int l = 0;
-    do{
-        num /= bignum::S;
-        l++;
-    }while (num != 0);
-    return l;
-}
-*/
-
 bignum::bignum(/* args */)
 {
     negative = false;
-    data = NULL;
+    data = new int[1]{0};
     mlength = 0;
     vlength = 1;
     vi64 = 0;
 }
 
-bignum::bignum(int64_t num){
+/*  保留该构造函数主要是为了方便 
+    能完成形如`bignum a = -123`的构造方法 
+ */
+bignum::bignum(int64_t num){            
     if(num == 0) {
         bignum();
         return;
@@ -62,11 +54,17 @@ bignum::bignum(int64_t num){
     }
 }
 
+/*  真正能构造大数的构造方法 
+    但是奇怪的是形如 `bignum a("12345")1 构造通过 
+                  `bignum b = "12345"` 却不能通过 
+    猜测是由于const char* 会让编译器觉得需要用int64_t构造函数
+ */
 bignum::bignum(const string& num){
-    if(_isnumstr(num)){
+    if(!_isnumstr(num)){
         bignum();
         return;
     }
+    negative = false;
     int a = 0;
     if(num[0] == '-'){
         negative = true;
@@ -81,8 +79,8 @@ bignum::bignum(const string& num){
     data[0] = atoi(num.substr(a,vlength % 9 - a).c_str());
     a = vlength % 9;
     for(int i = 1;i < mlength;i++){
-        a += 9;
         data[i] = atoi(num.substr(a,9).c_str());
+        a += 9;
     }
 }
 
@@ -94,21 +92,30 @@ bignum::~bignum()
     }
 }
 
+/*  完成到string的转换
+    但是在`cout`时却没有达到预期的结果
+    应该是`cout`时编译器调用了int64_t的隐式转换
+ */
 bignum::operator string() {
     stringstream ss;
     if(negative) ss << '-';
     for(int i=0;i<mlength;i++){
-        ss << data[i];
+        ss << data[i] << ',';
     }
     return ss.str();
 }
 
+/*  完成到int64_t的转换
+    由于这个函数存在,使得`cout`时想输出string得在前面加(string)
+ */
 bignum::operator int64_t() {
     if(!negative) return vi64;
+    if(vi64 != 9223372036854775807) return -vi64;
     if(mlength == 3 && data[0] == 9 && data[1] == 223372036 && data[2] == 854775807) return -vi64;
-    return - vi64 - 1;
+    return - vi64;
 }
 
+/*
 bignum bignum::operator+(const bignum& num){    // 简单起见 只处理"正数与正数"相加
     if(num.negative == negative){
         // 符号相同 简单相加
@@ -135,6 +142,7 @@ bignum bignum::operator-(const bignum& num){    // 简单起见 只处理"正数
 bignum bignum::operator*(const bignum& num){
     
 }
+*/
 
 bignum bignum::operator-(){
     bignum res(*this);
@@ -143,10 +151,47 @@ bignum bignum::operator-(){
 }
 
 bool bignum::operator<(const bignum& num){
-    
+    if(negative && !num.negative) return true;
+    if(!negative && num.negative) return false;
+    if(vlength != num.vlength)    return !negative == vlength < num.vlength;
+    for(int i=0;i<mlength;i++)  
+        if(data[i] != num.data[i]) return !negative == data[i] < num.data[i];
+    return false;
 }
-bool bignum::operator==(const bignum& num){}
-bool bignum::operator>(const bignum& num){}
+bool bignum::operator==(const bignum& num){
+    if(negative != num.negative || vlength != num.vlength || vi64 != num.vi64) return false;
+    for(int i = 0;i < mlength;i++)
+        if(data[i] != num.data[i]) return false;
+    return true;
+}
+bool bignum::operator>(const bignum& num){
+    if(negative && !num.negative) return false;                 //  负数小于正数
+    if(!negative && num.negative) return true;                  //  正数大于负数
+    if(vlength != num.vlength)    return !negative == vlength > num.vlength;    //  正数更长的大
+    for(int i = 0;i < mlength;i++)  
+        if(data[i] != num.data[i]) return !negative == data[i] > num.data[i];   //  正数更大的大
+    return false;                                               //  相等
+}
+
+bool bignum::operator<=(const bignum& num){
+    if(negative && !num.negative) return true;
+    if(!negative && num.negative) return false;
+    if(vlength != num.vlength)    return !negative == vlength < num.vlength;
+    for(int i=0;i<mlength;i++)  
+        if(data[i] != num.data[i]) return !negative == data[i] < num.data[i];
+    return true;
+}
+bool bignum::operator!=(const bignum& num){
+    return !(*this == num);
+}
+bool bignum::operator>=(const bignum& num){
+    if(negative && !num.negative) return false;
+    if(!negative && num.negative) return true;
+    if(vlength != num.vlength)    return !negative == vlength > num.vlength;
+    for(int i = 0;i < mlength;i++)  
+        if(data[i] != num.data[i]) return !negative == data[i] > num.data[i];
+    return true; 
+}
 
 bignum::bignum(const bignum& num){
     negative = num.negative;
@@ -158,3 +203,13 @@ bignum::bignum(const bignum& num){
         data[i] = num.data[i];
     }
 }
+
+// int main(){
+//     bignum a("123456789012345678922334499988866677744409875454012");
+//     bignum b = -122223747485;
+//     string s = a;
+//     int64_t i = b;
+//     cout << s << endl;
+//     cout << (string)a << '\n' << i << '\n' << b << endl;
+//     return 0;
+// }
