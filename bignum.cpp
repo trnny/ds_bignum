@@ -248,8 +248,41 @@ bignum bignum::operator-(const bignum& num) const{          // 简单起见 只�
 }
 
 bignum bignum::operator*(const bignum& num) const{
+    if(vi64 == 0 || num.vi64 == 0) return 0;        // 任意为0, 直接返回0
     bignum res;
-    res.negative = negative!=num.negative;
+    res.negative = negative!=num.negative;          // 长度上不会超出2数长度之和 不会小于2数长度之和-1
+    /* 定义数据 */
+
+    int carry, 
+        _tvl_max = vlength + num.vlength, 
+        _tvl_min = _tvl_max - 1, 
+        _tvl_big, 
+        _tvl_sml, 
+        _tml_big, 
+        _tml_max = (_tvl_max - 1) /9 + 1;
+    int *_tdata = new int[_tml_max], 
+        *_tdata_big;
+    string _tstrnum_sml;
+    if(vlength > num.vlength){
+        _tvl_big = vlength;
+        _tvl_sml = num.vlength;
+        _tml_big = mlength;
+        _tdata_big = data;
+        _tstrnum_sml = (string)num;
+    }else{
+        _tvl_big = num.vlength;
+        _tvl_sml = vlength;
+        _tml_big = num.mlength;
+        _tdata_big = num.data;
+        _tstrnum_sml = (string)*this;
+    }
+    int _offset;
+    for(int i=0;i<_tvl_sml;i++){            // 遍历乘数每个10进制数字
+        // work
+        for(int j = 0;j<_tml_big;j++) {     // 遍历被乘数每个10亿进制`int`
+            // work
+        }
+    }
 
     return res;             // 站位,还没写
 }
