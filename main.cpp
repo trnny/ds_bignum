@@ -1,10 +1,10 @@
 #include "bignum.h"
 
 int main(){
-    bignum a("123456789012345678922334499988866677744409875454012");
-    bignum b = 12345678901230000;
-    bignum c("-35464575");
-    bignum d = -122223747485;
+    bignum a("12345678901234567892233449998886667774440900000000");
+    string b = a + (bignum)22334455;
+    bignum c = 12345678901230000;
+    string d = bignum(-122223747485);
     cout << (string)a << '\n' << b << '\n' << c << '\n' << d << endl;
     return 0;
 }

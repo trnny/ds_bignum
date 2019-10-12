@@ -100,7 +100,7 @@ bignum::operator string() {
     stringstream ss;
     if(negative) ss << '-';
     for(int i=0;i<mlength;i++){
-        ss << data[i] << ',';
+        ss << data[i];
     }
     return ss.str();
 }
@@ -115,19 +115,60 @@ bignum::operator int64_t() {
     return - vi64;
 }
 
-/*
 bignum bignum::operator+(const bignum& num){    // 简单起见 只处理"正数与正数"相加
     if(num.negative == negative){
         // 符号相同 简单相加
         bignum res;
         res.negative = negative;
+        res.vi64 = vi64 + num.vi64;
+        if(res.vi64 < 0) res.vi64 = 9223372036854775807;
+        int carry = 0, _tvl_max/*可能的最大的10进制长度*/, _tml_max/*可能的最大10亿进制长度(即数组需要申请的长度)*/, _tml_big/*两个数中长度大的数组长度*/, _tml_min/*最小数组长度*/, _tvc/*每个10亿位上的计算结果值*/;
+        int *_tdata, *_tdata_big, *_tdata_min;      //  分别是 临时申请的数组, 长度大的数组, 长度短的数组
+        if(num.vlength>vlength){
+            _tvl_max = num.vlength + 1;
+            _tml_big = num.mlength;
+            _tml_min = mlength;
+            _tdata_big = num.data;
+            _tdata_min = data;
+        }else{
+            _tvl_max = vlength + 1;
+            _tml_big = mlength;
+            _tml_min = num.mlength;
+            _tdata_big = data;
+            _tdata_min = num.data;
+        }
+        _tml_max = _tvl_max / 9 + 1;
+        _tdata = new int[_tml_max];
+        for(int i=0;i<_tml_big;i++){
+            _tvc = _tdata_big[_tml_big - i - 1] + carry;
+            if(i<_tml_min) _tvc += _tdata_min[_tml_min - i - 1];
+            if(_tvc >= S){
+                carry = 1;
+                _tvc -= S;
+            }else{
+                carry = 0;
+            }
+            _tdata[_tml_big - i - 1] = _tvc;
+        }
+        if(carry) _tdata[0] = 1;            // 运算循环结束后还是有进位表示运算结果是进位的
+        int _toffset = _tdata[0] == 0;      // _tdata[0] == 0 表示两个含义 1,在长度上`进位了` 是为了防止有进位多申请一个空间 2,实际运算结果没有进位  如果申请的额外一空间是空, _offset 为 1
+        res.vlength = _tvl_max - _toffset;
+        res.mlength = _tml_max - _toffset;
+        for(int i=0;i<res.mlength;i++){
+            res.data[i] = _tdata[i+_toffset];
+        }
+        delete[] _tdata;
+        return res;
     }else if(negative){
         // 自己负数 别人正数
+
     }else{
         // 自己正数 别人负数
     }
+    return 0;
 }
 
+/*
 bignum bignum::operator-(const bignum& num){    // 简单起见 只处理"正数与正数"相减
     if(num.negative == negative){
         bignum res;
@@ -203,13 +244,3 @@ bignum::bignum(const bignum& num){
         data[i] = num.data[i];
     }
 }
-
-// int main(){
-//     bignum a("123456789012345678922334499988866677744409875454012");
-//     bignum b = -122223747485;
-//     string s = a;
-//     int64_t i = b;
-//     cout << s << endl;
-//     cout << (string)a << '\n' << i << '\n' << b << endl;
-//     return 0;
-// }
