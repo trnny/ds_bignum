@@ -1,5 +1,6 @@
 #pragma once
 #include <iostream>
+#include <stdlib.h>
 #include <string>
 #include <sstream>
 
@@ -20,19 +21,19 @@ public:
     bignum(const bignum& num);
     bignum(int64_t num);        // 简单起见 超出int64范围就按照边缘给出
     ~bignum();
-    /*explicit*/ operator int64_t();        // cout 时将默认以int64输出 虽然有转向string的定义 但隐式还是会只执行这个
-    operator string();
+    /*explicit*/ operator int64_t() const;        // cout 时将默认以int64输出 虽然有转向string的定义 但隐式还是会只执行这个
+    operator string() const;
     // 算术运算符
-    bignum operator+(const bignum& num);
-    bignum operator-(const bignum& num);
-    bignum operator*(const bignum& num);
+    bignum operator+(const bignum& num) const;
+    bignum operator-(const bignum& num) const;
+    bignum operator*(const bignum& num) const;
     // 负运算符
-    bignum operator-();
+    bignum operator-() const;
     // 比较运算符
-    bool operator<(const bignum& num);
-    bool operator==(const bignum& num);
-    bool operator>(const bignum& num);
-    bool operator<=(const bignum& num);
-    bool operator!=(const bignum& num);
-    bool operator>=(const bignum& num);
+    bool operator<(const bignum& num) const;
+    bool operator==(const bignum& num) const;
+    bool operator>(const bignum& num) const;
+    bool operator<=(const bignum& num) const;
+    bool operator!=(const bignum& num) const;
+    bool operator>=(const bignum& num) const;
 };

@@ -82,8 +82,8 @@ bignum::bignum(const string& num){
     ss << num.substr(a,vlength).c_str();
     ss >> vi64;
     data = new int[mlength];
-    data[0] = atoi(num.substr(a,vlength % 9 - a).c_str());
-    a = vlength % 9;
+    data[0] = atoi(num.substr(a, (vlength - 1) % 9 + 1 - a).c_str());
+    a = (vlength - 1) % 9 + 1;
     for(int i = 1;i < mlength;i++){
         data[i] = atoi(num.substr(a,9).c_str());
         a += 9;
@@ -127,7 +127,6 @@ bignum::operator int64_t() const {
 
 bignum bignum::operator+(const bignum& num) const{          // 简单起见 只处理"正数与正数"相加
     if(num.negative == negative){
-        // 符号相同 简单相加
         bignum res;
         res.negative = negative;
         res.vi64 = vi64 + num.vi64;
@@ -158,12 +157,13 @@ bignum bignum::operator+(const bignum& num) const{          // 简单起见 只�
             }else{
                 carry = 0;
             }
-            _tdata[_tml_big - i - 1] = _tvc;
+            _tdata[_tml_max - i - 1] = _tvc;        // 从后往前填
         }
         if(carry) _tdata[0] = 1;            // 运算循环结束后还是有进位表示运算结果是进位的
         int _toffset = _tdata[0] == 0;      // _tdata[0] == 0 表示两个含义 1,在长度上`进位了` 是为了防止有进位多申请一个空间 2,实际运算结果没有进位  如果申请的额外一空间是空, _offset 为 1
         res.vlength = _tvl_max - _toffset;
         res.mlength = _tml_max - _toffset;
+        res.data = new int[res.mlength];
         for(int i=0;i<res.mlength;i++){
             res.data[i] = _tdata[i+_toffset];
         }
@@ -178,9 +178,70 @@ bignum bignum::operator+(const bignum& num) const{          // 简单起见 只�
 bignum bignum::operator-(const bignum& num) const{          // 简单起见 只处理"正数与正数"相减 且"大数减小数"
     if(num.negative == negative){
         bignum res;
-        res.negative = negative;
-
-        return res;         // 待会再写,先试一下+
+        res.vlength = 0;
+        int carry = 0, _tml_big, _tml_sml, _tvc;
+        int *_tdata, *_tdata_big, *_tdata_sml;
+        if(*this > num){
+            res.negative = negative;
+            _tml_big = mlength;
+            _tml_sml = num.mlength;
+            _tdata_big = data;
+            _tdata_sml = num.data;
+        }else{
+            res.negative = !negative;
+            _tml_big = num.mlength;
+            _tml_sml = mlength;
+            _tdata_big = num.data;
+            _tdata_sml = data;
+        }
+        _tdata = new int[_tml_big];
+        for(int i=0;i<_tml_big;i++){
+            _tvc = _tdata_big[_tml_big - i -1] - carry;
+            if(i<_tml_sml) _tvc -= _tdata_sml[_tml_sml - i - 1];
+            if(_tvc < 0){
+                carry = 1;
+                _tvc += S;
+            }else{
+                carry = 0;
+            }
+            _tdata[_tml_big - i - 1] = _tvc;
+        }
+        bool _tvs = false;
+        int _offset;
+        for(int i = 0;i<_tml_big;i++){
+            if(!_tvs && _tdata[i]){
+                _tvs = true;
+                _offset = i;
+                res.mlength = _tml_big - i;
+                res.data = new int[res.mlength];
+                res.data[0] = _tdata[i];
+                res.vi64 = _tdata[i];
+                res.vlength += _getvi64len(_tdata[i]);
+                continue;
+            }
+            res.data[i - _offset] = _tdata[i];
+            res.vlength += 9;
+        }
+        if(!_tvs){          // 结果是0 注意,这种情况res很多变量未初始化
+            res.vlength = 1;
+            res.mlength = 1;
+            res.data = new int[1]{0};
+            res.vi64 = 0;
+            res.negative = false;
+        }
+        else if(res.vlength>19)
+            res.vi64 = 9223372036854775807;
+        else{
+            for(int i=1;i<res.mlength;i++){
+                res.vi64 *= S;
+                if(res.vi64 <= 0) break;
+                res.vi64 += res.data[i];
+            }
+            if(res.vi64 <= 0)
+                res.vi64 = 9223372036854775807;
+        }
+        delete[] _tdata;
+        return res;
     }
     else                            // *this - num -> *this + -num;
         return *this + -num;
@@ -261,11 +322,11 @@ bignum::bignum(const bignum& num){
  * 先留着吧,程序出问题的时候.sh看不到错在哪,留着方便调试
  */
 // int main(){
-//     string a = (bignum)"12345678901234567892233449998886667774440900000000" + (bignum)22334455;
-//     string b = (bignum)12345678901230000 + (bignum)472839548;
-//     bignum c = 0;   // 看来空的是有问题的
-//     string d = (bignum)123456789;
-//     string e = (bignum)"1234567891234567890";
-//     cout << a << '\n' << b << '\n' << (string)c << '\n' << d << '\n' << e << endl;
+//     string a = (bignum)"12345678901234567892233449998886667774440900000000" - (bignum)22334455;
+//     string b = (bignum)-12345678901230000 + (bignum)-472839548;
+//     string c = (bignum)"";
+//     string d = (bignum)"1000000000000000000000000000000000000000000000000000000000000000000000000000" - (bignum)"9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999";
+//     string e = (bignum)"999999999" - (bignum)1;
+//     cout << a << '\n' << b << '\n' << c << '\n' << d << '\n' << e << endl;
 //     return 0;
 // }
