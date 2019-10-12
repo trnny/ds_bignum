@@ -7,10 +7,10 @@
             "command": "g++",
             "args": [
                 "-g", 
-                "${file}", 
-                "-std=c++11", 
+                "${file}",
+                "-std=c++11",
                 "-o", 
-                "${workspaceFolder}/${fileBasenameNoExtension}.out"
+                "${workspaceFolder}/${fileBasenameNoExtension}"
             ],   
         }
     ],
@@ -18,7 +18,7 @@
         "owner": "cpp",  
         "fileLocation": [ 
             "relative", 
-            "${workspaceRoot}" 
+            "${workspaceFolder}" 
         ], 
         "pattern": { 
             "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$", 

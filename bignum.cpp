@@ -2,6 +2,8 @@
 
 const int bignum::S  = 1000000000;
 
+/*  判断一个数的十进制长度
+ */
 static int _getvi64len(int64_t num){
     int l = 0;
     do{
@@ -11,11 +13,15 @@ static int _getvi64len(int64_t num){
     return l;
 }
 
-static bool _isnumstr(const string& num){       // 判断输入的字符串和不合格 (简单起见,只允许输入纯数字或者负号加纯数字)
-    if(num[0] != '-' && (num[0] < 0x30 || num[0] > 0x39)) return false;
+/*  判断输入的字符串符不符合要求
+    简单起见,只允许输入纯数字或者负号加纯数字
+ */
+static bool _isnumstr(const string& num){ 
+    if(num.length() == 0 || (num.length() == 1 && num[0] == '-')) return false;     // 空的或者只有一个负号
+    if(num[0] != '-' && (num[0] < 0x30 || num[0] > 0x39)) return false;         // 第一个不是负号也不是数字
     for(int i =1; i < num.length(); i++)
     {  
-        if(num[i]<0x30||num[i]>0x39) return false;
+        if(num[i]<0x30||num[i]>0x39) return false;                              // 第一关之后不是数字
     }
     return true;
 }
@@ -24,7 +30,7 @@ bignum::bignum(/* args */)
 {
     negative = false;
     data = new int[1]{0};
-    mlength = 0;
+    mlength = 1;
     vlength = 1;
     vi64 = 0;
 }
@@ -34,7 +40,7 @@ bignum::bignum(/* args */)
  */
 bignum::bignum(int64_t num){            
     if(num == 0) {
-        bignum();
+        new (this)bignum();     // 使用默认的构造函数
         return;
     }
     if(num < 0) {
@@ -46,7 +52,7 @@ bignum::bignum(int64_t num){
     vi64 = num;
     vlength = _getvi64len(vi64);
     // mlength = _getvi64mlen(vi64);
-    mlength = vlength / 9 + 1;
+    mlength = (vlength - 1) / 9 + 1;
     data = new int[mlength];
     for(int i = 0;i<mlength;i++){
         data[mlength - i - 1] = num % S;
@@ -61,7 +67,7 @@ bignum::bignum(int64_t num){
  */
 bignum::bignum(const string& num){
     if(!_isnumstr(num)){
-        bignum();
+        new (this)bignum();     // 输入不合格,使用默认的构造函数
         return;
     }
     negative = false;
@@ -71,7 +77,7 @@ bignum::bignum(const string& num){
         a = 1;
     }
     vlength = num.length() - a;
-    mlength = vlength / 9 + 1;
+    mlength = (vlength - 1) / 9 + 1;
     stringstream ss;
     ss << num.substr(a,vlength).c_str();
     ss >> vi64;
@@ -96,10 +102,14 @@ bignum::~bignum()
     但是在`cout`时却没有达到预期的结果
     应该是`cout`时编译器调用了int64_t的隐式转换
  */
-bignum::operator string() {
+bignum::operator string() const {
+    // if(NULL == data) return "0";         // 在默认的构造中同样给data分配了空间,不用检查是否为空了
     stringstream ss;
     if(negative) ss << '-';
-    for(int i=0;i<mlength;i++){
+    ss << data[0];                          // 第一个前面的0可以省
+    for(int i = 1;i < mlength;i++){         // 这里得小心, 一开始马虎了, 长度不到9的int在转成字符串时会短(前面的0省略了)
+        ss.width(9);
+        ss.fill('0');
         ss << data[i];
     }
     return ss.str();
@@ -108,14 +118,14 @@ bignum::operator string() {
 /*  完成到int64_t的转换
     由于这个函数存在,使得`cout`时想输出string得在前面加(string)
  */
-bignum::operator int64_t() {
+bignum::operator int64_t() const {
     if(!negative) return vi64;
     if(vi64 != 9223372036854775807) return -vi64;
     if(mlength == 3 && data[0] == 9 && data[1] == 223372036 && data[2] == 854775807) return -vi64;
     return - vi64;
 }
 
-bignum bignum::operator+(const bignum& num){    // 简单起见 只处理"正数与正数"相加
+bignum bignum::operator+(const bignum& num) const{          // 简单起见 只处理"正数与正数"相加
     if(num.negative == negative){
         // 符号相同 简单相加
         bignum res;
@@ -137,7 +147,7 @@ bignum bignum::operator+(const bignum& num){    // 简单起见 只处理"正数
             _tdata_big = data;
             _tdata_min = num.data;
         }
-        _tml_max = _tvl_max / 9 + 1;
+        _tml_max = (_tvl_max - 1) / 9 + 1;
         _tdata = new int[_tml_max];
         for(int i=0;i<_tml_big;i++){
             _tvc = _tdata_big[_tml_big - i - 1] + carry;
@@ -159,53 +169,53 @@ bignum bignum::operator+(const bignum& num){    // 简单起见 只处理"正数
         }
         delete[] _tdata;
         return res;
-    }else if(negative){
-        // 自己负数 别人正数
-
-    }else{
-        // 自己正数 别人负数
     }
-    return 0;
+    else                            // 自己正数 别人负数 *this + num -> *this - (-num);
+        return *this - -num;
 }
 
-/*
-bignum bignum::operator-(const bignum& num){    // 简单起见 只处理"正数与正数"相减
+
+bignum bignum::operator-(const bignum& num) const{          // 简单起见 只处理"正数与正数"相减 且"大数减小数"
     if(num.negative == negative){
         bignum res;
         res.negative = negative;
-    }else if(negative){
-        // 自己负数 别人正数 
-    }else {
-        // 自己正数 别人负数
+
+        return res;         // 待会再写,先试一下+
     }
+    else                            // *this - num -> *this + -num;
+        return *this + -num;
 }
 
-bignum bignum::operator*(const bignum& num){
-    
-}
-*/
+bignum bignum::operator*(const bignum& num) const{
+    bignum res;
+    res.negative = negative!=num.negative;
 
-bignum bignum::operator-(){
+    return res;             // 站位,还没写
+}
+
+bignum bignum::operator-() const{
     bignum res(*this);
     res.negative = !negative;
     return res;
 }
 
-bool bignum::operator<(const bignum& num){
+bool bignum::operator<(const bignum& num) const{
     if(negative && !num.negative) return true;
     if(!negative && num.negative) return false;
     if(vlength != num.vlength)    return !negative == vlength < num.vlength;
     for(int i=0;i<mlength;i++)  
         if(data[i] != num.data[i]) return !negative == data[i] < num.data[i];
-    return false;
+    return false;                                                                   // 相等
 }
-bool bignum::operator==(const bignum& num){
+
+bool bignum::operator==(const bignum& num) const{
     if(negative != num.negative || vlength != num.vlength || vi64 != num.vi64) return false;
     for(int i = 0;i < mlength;i++)
         if(data[i] != num.data[i]) return false;
     return true;
 }
-bool bignum::operator>(const bignum& num){
+
+bool bignum::operator>(const bignum& num) const{
     if(negative && !num.negative) return false;                 //  负数小于正数
     if(!negative && num.negative) return true;                  //  正数大于负数
     if(vlength != num.vlength)    return !negative == vlength > num.vlength;    //  正数更长的大
@@ -214,18 +224,20 @@ bool bignum::operator>(const bignum& num){
     return false;                                               //  相等
 }
 
-bool bignum::operator<=(const bignum& num){
+bool bignum::operator<=(const bignum& num) const{
     if(negative && !num.negative) return true;
     if(!negative && num.negative) return false;
     if(vlength != num.vlength)    return !negative == vlength < num.vlength;
     for(int i=0;i<mlength;i++)  
         if(data[i] != num.data[i]) return !negative == data[i] < num.data[i];
-    return true;
+    return true;                                                                    // 与小于号操作符唯一区别点, 前面代码都一样
 }
-bool bignum::operator!=(const bignum& num){
+
+bool bignum::operator!=(const bignum& num) const{
     return !(*this == num);
 }
-bool bignum::operator>=(const bignum& num){
+
+bool bignum::operator>=(const bignum& num) const{
     if(negative && !num.negative) return false;
     if(!negative && num.negative) return true;
     if(vlength != num.vlength)    return !negative == vlength > num.vlength;
@@ -244,3 +256,16 @@ bignum::bignum(const bignum& num){
         data[i] = num.data[i];
     }
 }
+
+/**
+ * 先留着吧,程序出问题的时候.sh看不到错在哪,留着方便调试
+ */
+// int main(){
+//     string a = (bignum)"12345678901234567892233449998886667774440900000000" + (bignum)22334455;
+//     string b = (bignum)12345678901230000 + (bignum)472839548;
+//     bignum c = 0;   // 看来空的是有问题的
+//     string d = (bignum)123456789;
+//     string e = (bignum)"1234567891234567890";
+//     cout << a << '\n' << b << '\n' << (string)c << '\n' << d << '\n' << e << endl;
+//     return 0;
+// }
