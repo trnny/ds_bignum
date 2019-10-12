@@ -29,7 +29,7 @@ static bool _isnumstr(const string& num){
 bignum::bignum(/* args */)
 {
     negative = false;
-    data = new int[1]{0};
+    data = new int[1]{0};      // 编译器偶尔自动补0 ???
     mlength = 1;
     vlength = 1;
     vi64 = 0;
@@ -76,14 +76,14 @@ bignum::bignum(const string& num){
         negative = true;
         a = 1;
     }
-    vlength = num.length() - a;
-    mlength = (vlength - 1) / 9 + 1;
+    vlength = num.length() - a;             // 一定会大于等于1(该数字一定有长度)
+    mlength = (vlength - 1) / 9 + 1;        // 不足9为1, 等于9为1, 超过9`加1`
     stringstream ss;
     ss << num.substr(a,vlength).c_str();
     ss >> vi64;
     data = new int[mlength];
-    data[0] = atoi(num.substr(a, (vlength - 1) % 9 + 1 - a).c_str());
-    a = (vlength - 1) % 9 + 1;
+    data[0] = atoi(num.substr(a, (vlength - 1) % 9 + 1 - a).c_str());       // 把头切下来, 不足或等于9为本身,超过9`减`9
+    a = (vlength - 1) % 9 + 1;          // 切头后的开始索引, 后面的与`9`对齐了
     for(int i = 1;i < mlength;i++){
         data[i] = atoi(num.substr(a,9).c_str());
         a += 9;
@@ -146,16 +146,15 @@ bignum bignum::operator+(const bignum& num) const{          // 简单起见 只�
             _tdata_big = data;
             _tdata_min = num.data;
         }
-        _tml_max = (_tvl_max - 1) / 9 + 1;
-        _tdata = new int[_tml_max];
+        _tml_max = (_tvl_max - 1) / 9 + 1;      // 不超过9为1 超过9`加1`
+        _tdata = new int[_tml_max]{0};
         for(int i=0;i<_tml_big;i++){
             _tvc = _tdata_big[_tml_big - i - 1] + carry;
+            carry = 0;
             if(i<_tml_min) _tvc += _tdata_min[_tml_min - i - 1];
             if(_tvc >= S){
                 carry = 1;
                 _tvc -= S;
-            }else{
-                carry = 0;
             }
             _tdata[_tml_max - i - 1] = _tvc;        // 从后往前填
         }
@@ -197,12 +196,11 @@ bignum bignum::operator-(const bignum& num) const{          // 简单起见 只�
         _tdata = new int[_tml_big];
         for(int i=0;i<_tml_big;i++){
             _tvc = _tdata_big[_tml_big - i -1] - carry;
+            carry = 0;
             if(i<_tml_sml) _tvc -= _tdata_sml[_tml_sml - i - 1];
             if(_tvc < 0){
                 carry = 1;
                 _tvc += S;
-            }else{
-                carry = 0;
             }
             _tdata[_tml_big - i - 1] = _tvc;
         }
@@ -253,14 +251,14 @@ bignum bignum::operator*(const bignum& num) const{
     res.negative = negative!=num.negative;          // 长度上不会超出2数长度之和 不会小于2数长度之和-1
     /* 定义数据 */
 
-    int carry, 
+    int carry = 0, 
         _tvl_max = vlength + num.vlength, 
         _tvl_min = _tvl_max - 1, 
         _tvl_big, 
         _tvl_sml, 
         _tml_big, 
-        _tml_max = (_tvl_max - 1) /9 + 1;
-    int *_tdata = new int[_tml_max], 
+        _tml_max = (_tvl_max - 1) / 9 + 1;
+    int *_tdata = new int[_tml_max]{0},        // 编译器已经帮补零了
         *_tdata_big;
     string _tstrnum_sml;
     if(vlength > num.vlength){
@@ -276,15 +274,48 @@ bignum bignum::operator*(const bignum& num) const{
         _tdata_big = num.data;
         _tstrnum_sml = (string)*this;
     }
-    int _offset;
+    int _pow10[9] = {1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000};   // 用于计算`位移`
+    int _offset_outer, 
+        _offset_inner;
+    int64_t _tvi64c;
+    int _tvi10;         // 乘数的数字 10以内
     for(int i=0;i<_tvl_sml;i++){            // 遍历乘数每个10进制数字
         // work
+        _offset_outer = i / 9;
+        _offset_inner = i % 9;              // 0 ~ 8
+        _tvi10 = _tstrnum_sml[_tvl_sml - i - 1] - 0x30;     // 第i个进行运算的数字 (即除数倒数i个)
+        if(!_tvi10) continue;
         for(int j = 0;j<_tml_big;j++) {     // 遍历被乘数每个10亿进制`int`
             // work
+            _tvi64c = _tdata_big[_tml_big - j -1] * _tvi10 + carry;
+            carry = 0;
+            _tvi64c *= _pow10[_offset_inner];
+            if(_tvi64c >= S){
+                carry = _tvi64c / S;
+                _tvi64c %= S;
+            }
+            _tdata[_tml_max - _offset_outer - 1] += _tvi64c;
         }
+        _tdata[_tml_max - _offset_outer - 2] += carry;  // 再向前1位
+        carry = 0;
     }
-
-    return res;             // 站位,还没写
+    int _toffset = _tdata[0] == 0;
+    res.vlength = _tvl_max - _toffset;
+    res.mlength = _tml_max - _toffset;
+    res.data = new int[res.mlength];
+    for(int i=0;i<res.mlength;i++){
+        res.data[i] = _tdata[i+_toffset];
+    }
+    delete[] _tdata;
+    if(res.vlength>19) res.vi64 = 9223372036854775807;
+    else if(res.mlength == 1) res.vi64 = res.data[0];
+    else if(res.mlength == 2) res.vi64 = res.data[0] * S + res.data[1];
+    else if(res.mlength == 3){
+        res.vi64 = res.data[0] * S *S + res.data[1] * S + res.data[2];
+        if(res.vi64 < 0)
+            res.vi64 = 9223372036854775807;
+    }
+    return res;
 }
 
 bignum bignum::operator-() const{
@@ -354,12 +385,13 @@ bignum::bignum(const bignum& num){
 /**
  * 先留着吧,程序出问题的时候.sh看不到错在哪,留着方便调试
  */
-// int main(){
-//     string a = (bignum)"12345678901234567892233449998886667774440900000000" - (bignum)22334455;
-//     string b = (bignum)-12345678901230000 + (bignum)-472839548;
-//     string c = (bignum)"";
-//     string d = (bignum)"1000000000000000000000000000000000000000000000000000000000000000000000000000" - (bignum)"9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999";
-//     string e = (bignum)"999999999" - (bignum)1;
-//     cout << a << '\n' << b << '\n' << c << '\n' << d << '\n' << e << endl;
-//     return 0;
-// }
+int main(){
+    string a = (bignum)"1234567" * (bignum)22334455;
+    string b = (bignum)-123456 + (bignum)-200;
+    string c = (bignum)"" * (bignum)123;
+    // string d = (bignum)"1000000000000000000000000000000000000000000000000000000000000000000000000000" - (bignum)"9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999";
+    string e = (bignum)"999999999" * (bignum)1;
+    // cout << a << '\n' << b << '\n' << c << '\n' << d << '\n' << e << endl;
+    cout << a << '\n' << b << '\n' << c << '\n' << e << endl;
+    return 0;
+}
