@@ -159,13 +159,13 @@ bignum bignum::operator+(const bignum& num) const{          // 简单起见 只�
             _tdata[_tml_max - i - 1] = _tvc;        // 从后往前填
         }
         if(carry) _tdata[0] = 1;            // 运算循环结束后还是有进位表示运算结果是进位的
-        int _toffset = _tdata[0] == 0;      // _tdata[0] == 0 表示两个含义 1,在长度上`进位了` 是为了防止有进位多申请一个空间 2,实际运算结果没有进位  如果申请的额外一空间是空, _offset 为 1
-        res.vlength = _tvl_max - _toffset;
+        int _toffset = _tdata[0] == 0;      // _tdata[0] == 0 表示实际运算结果没有进位 申请的额外一空间是空
         res.mlength = _tml_max - _toffset;
         res.data = new int[res.mlength];
         for(int i=0;i<res.mlength;i++){
             res.data[i] = _tdata[i+_toffset];
         }
+        res.vlength = _getvi64len(res.data[0]) + (res.mlength - 1) * 9;
         delete[] _tdata;
         return res;
     }
@@ -177,7 +177,6 @@ bignum bignum::operator+(const bignum& num) const{          // 简单起见 只�
 bignum bignum::operator-(const bignum& num) const{          // 简单起见 只处理"正数与正数"相减 且"大数减小数"
     if(num.negative == negative){
         bignum res;
-        res.vlength = 0;
         int carry = 0, _tml_big, _tml_sml, _tvc;
         int *_tdata, *_tdata_big, *_tdata_sml;
         if(*this > num){
@@ -214,19 +213,14 @@ bignum bignum::operator-(const bignum& num) const{          // 简单起见 只�
                 res.data = new int[res.mlength];
                 res.data[0] = _tdata[i];
                 res.vi64 = _tdata[i];
-                res.vlength += _getvi64len(_tdata[i]);
+                res.vlength = _getvi64len(_tdata[i]);       // 这里不和加 乘采一样的操作是因为这步res.data不一定初始化,免得另作判断
                 continue;
             }
             res.data[i - _offset] = _tdata[i];
             res.vlength += 9;
         }
-        if(!_tvs){          // 结果是0 注意,这种情况res很多变量未初始化
-            res.vlength = 1;
-            res.mlength = 1;
-            res.data = new int[1]{0};
-            res.vi64 = 0;
-            res.negative = false;
-        }
+        if(!_tvs)
+            res.negative = false;       // 其余变量都在默认构造函数里初始化了
         else if(res.vlength>19)
             res.vi64 = 9223372036854775807;
         else{
@@ -248,11 +242,10 @@ bignum bignum::operator-(const bignum& num) const{          // 简单起见 只�
 bignum bignum::operator*(const bignum& num) const{
     if(vi64 == 0 || num.vi64 == 0) return 0;        // 任意为0, 直接返回0
     bignum res;
-    res.negative = negative!=num.negative;          // 长度上不会超出2数长度之和 不会小于2数长度之和-1
+    res.negative = negative!=num.negative;
     /* 定义数据 */
-
     int carry = 0, 
-        _tvl_max = vlength + num.vlength, 
+        _tvl_max = vlength + num.vlength,   // 长度上不会超出2数长度之和 不会小于2数长度之和-1
         _tvl_min = _tvl_max - 1, 
         _tvl_big, 
         _tvl_sml, 
@@ -261,6 +254,7 @@ bignum bignum::operator*(const bignum& num) const{
     int *_tdata = new int[_tml_max]{0},        // 编译器已经帮补零了
         *_tdata_big;
     string _tstrnum_sml;
+    int _tstrnum_len;
     if(vlength > num.vlength){
         _tvl_big = vlength;
         _tvl_sml = num.vlength;
@@ -274,38 +268,51 @@ bignum bignum::operator*(const bignum& num) const{
         _tdata_big = num.data;
         _tstrnum_sml = (string)*this;
     }
+    _tstrnum_len = _tstrnum_sml.length();
     int _pow10[9] = {1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000};   // 用于计算`位移`
     int _offset_outer, 
         _offset_inner;
-    int64_t _tvi64c;
-    int _tvi10;         // 乘数的数字 10以内
+    int64_t _tvi64c,        // 用来保存每位上与数组的乘
+            _tvi64v;        // 用来存运算后的值
+    int _tvi10;             // 乘数的数字 10以内
     for(int i=0;i<_tvl_sml;i++){            // 遍历乘数每个10进制数字
         // work
         _offset_outer = i / 9;
         _offset_inner = i % 9;              // 0 ~ 8
-        _tvi10 = _tstrnum_sml[_tvl_sml - i - 1] - 0x30;     // 第i个进行运算的数字 (即除数倒数i个)
+        _tvi10 = _tstrnum_sml[_tstrnum_len - i - 1] - 0x30;     // 第i个进行运算的数字 (即除数倒数i个)
         if(!_tvi10) continue;
-        for(int j = 0;j<_tml_big;j++) {     // 遍历被乘数每个10亿进制`int`
+        for(int j = 0;j<_tml_big;j++) {     // 遍历被乘数每个10亿进制`int`      乘积累加
             // work
-            _tvi64c = _tdata_big[_tml_big - j -1] * _tvi10 + carry;
+            _tvi64c = (int64_t)_tdata_big[_tml_big - j -1] * _tvi10 + carry;        // 这里得先转换一下位数, 不然就是int相乘了,会溢出
             carry = 0;
             _tvi64c *= _pow10[_offset_inner];
             if(_tvi64c >= S){
-                carry = _tvi64c / S;
+                carry = _tvi64c / S;                            // 乘部分的进位
                 _tvi64c %= S;
             }
-            _tdata[_tml_max - _offset_outer - 1] += _tvi64c;
+            _tvi64v = _tdata[_tml_max - _offset_outer - j - 1] + _tvi64c;
+            if(_tvi64v >= S){      // 累加部分的进位 
+                carry++;                                        // 这里不合并到下面的for语句因为这里carry不确定
+                _tvi64v -= S;
+            }
+            _tdata[_tml_max - _offset_outer - j - 1] = _tvi64v;
+            for(int k = _tml_max - _offset_outer - j - 2; carry != 0;k--){      // 循环进位加到前头元素, 原则上不会越界,不需要判断k>=0
+                _tdata[k] += carry;
+                carry = 0;
+                if(_tdata[k] >= S){
+                    carry = 1;
+                    _tdata[k] -= S;
+                }
+            }
         }
-        _tdata[_tml_max - _offset_outer - 2] += carry;  // 再向前1位
-        carry = 0;
     }
-    int _toffset = _tdata[0] == 0;
-    res.vlength = _tvl_max - _toffset;
+    int _toffset = _tdata[0] == 0;              // 是否需要移位(_tdata申请空间比运算实际结果空间长1)
     res.mlength = _tml_max - _toffset;
     res.data = new int[res.mlength];
     for(int i=0;i<res.mlength;i++){
         res.data[i] = _tdata[i+_toffset];
     }
+    res.vlength = _getvi64len(res.data[0]) + (res.mlength - 1) * 9;
     delete[] _tdata;
     if(res.vlength>19) res.vi64 = 9223372036854775807;
     else if(res.mlength == 1) res.vi64 = res.data[0];
@@ -318,6 +325,9 @@ bignum bignum::operator*(const bignum& num) const{
     return res;
 }
 
+/**
+ * 取相反数, 直接取反negative就行
+ */
 bignum bignum::operator-() const{
     bignum res(*this);
     res.negative = !negative;
@@ -371,6 +381,9 @@ bool bignum::operator>=(const bignum& num) const{
     return true; 
 }
 
+/**
+ * 拷贝构造函数,将主要是复制data里的数据
+ */
 bignum::bignum(const bignum& num){
     negative = num.negative;
     mlength = num.mlength;
@@ -385,13 +398,11 @@ bignum::bignum(const bignum& num){
 /**
  * 先留着吧,程序出问题的时候.sh看不到错在哪,留着方便调试
  */
-int main(){
-    string a = (bignum)"1234567" * (bignum)22334455;
-    string b = (bignum)-123456 + (bignum)-200;
-    string c = (bignum)"" * (bignum)123;
-    // string d = (bignum)"1000000000000000000000000000000000000000000000000000000000000000000000000000" - (bignum)"9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999";
-    string e = (bignum)"999999999" * (bignum)1;
-    // cout << a << '\n' << b << '\n' << c << '\n' << d << '\n' << e << endl;
-    cout << a << '\n' << b << '\n' << c << '\n' << e << endl;
-    return 0;
-}
+// int main(){
+//     string a = (bignum)"199804141998041419980414199804141998041419980414" * (bignum)"1627405150" * (bignum)"15895567150";
+//     string b = (bignum)"99999999999999999999999999999999999999999999999999999" * (bignum)"1234567890987654321";
+//     string c = (bignum)"10000000000000000000000000000" + (bignum)222222 + (bignum)33333000000000000 + (bignum)"990000000000000000000000";
+//     string d = (bignum)"500000000000000" * (bignum)300004000 - (bignum)"100000000000000000000000000000000000000000000000000000000000";
+//     cout << a << '\n' << b << '\n' << c << '\n' << d << endl;
+//     return 0;
+// }
