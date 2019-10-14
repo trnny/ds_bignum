@@ -17,7 +17,7 @@ static int _getvi64len(int64_t num){
     简单起见,只允许输入纯数字或者负号加纯数字
  */
 static bool _isnumstr(const string& num){ 
-    if(num.length() == 0 || (num.length() == 1 && num[0] == '-')) return false;     // 空的或者只有一个负号
+    if(num.length() == 0 || (num.length() == 1 && (num[0] == '-'|| num[0] == 0x30))) return false;     // 空的或者只有一个负号或0
     if(num[0] != '-' && (num[0] < 0x30 || num[0] > 0x39)) return false;         // 第一个不是负号也不是数字
     for(int i =1; i < num.length(); i++)
     {  
@@ -71,12 +71,13 @@ bignum::bignum(const string& num){
         return;
     }
     negative = false;
-    int a = 0;
+    int a = 0;                  // 记录跳过的长度
     if(num[0] == '-'){
         negative = true;
         a = 1;
     }
-    vlength = num.length() - a;             // 一定会大于等于1(该数字一定有长度)
+    while(num[a] == 0x30 && ++a < num.length() - 1);            // 消除前头无意义的"0" , a最大为num.length() - 1;
+    vlength = num.length() - a;             // 一定会大于等于1(该数字一定会有长度)
     mlength = (vlength - 1) / 9 + 1;        // 不足9为1, 等于9为1, 超过9`加1`
     stringstream ss;
     ss << num.substr(a,vlength).c_str();
