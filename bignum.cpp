@@ -61,7 +61,7 @@ bignum::bignum(int64_t num){
 }
 
 /*  真正能构造大数的构造方法 
-    但是奇怪的是形如 `bignum a("12345")1 构造通过 
+    但是奇怪的是形如 `bignum a("12345") 构造通过 
                   `bignum b = "12345"` 却不能通过 
     猜测是由于const char* 会让编译器觉得需要用int64_t构造函数
  */
@@ -83,8 +83,8 @@ bignum::bignum(const string& num){
     ss << num.substr(a,vlength).c_str();
     ss >> vi64;
     data = new int[mlength];
-    data[0] = atoi(num.substr(a, (vlength - 1) % 9 + 1 - a).c_str());       // 把头切下来, 不足或等于9为本身,超过9`减`9
-    a = (vlength - 1) % 9 + 1;          // 切头后的开始索引, 后面的与`9`对齐了
+    data[0] = atoi(num.substr(a, (vlength - 1) % 9 + 1).c_str());       // 把头切下来, 不足或等于9为本身,超过9`减`9
+    a += (vlength - 1) % 9 + 1;          // 切头后的开始索引, 后面的与`9`对齐了
     for(int i = 1;i < mlength;i++){
         data[i] = atoi(num.substr(a,9).c_str());
         a += 9;
@@ -400,10 +400,8 @@ bignum::bignum(const bignum& num){
  * 先留着吧,程序出问题的时候.sh看不到错在哪,留着方便调试
  */
 // int main(){
-//     string a = (bignum)"199804141998041419980414199804141998041419980414" * (bignum)"1627405150" * (bignum)"15895567150";
-//     string b = (bignum)"99999999999999999999999999999999999999999999999999999" * (bignum)"1234567890987654321";
-//     string c = (bignum)"10000000000000000000000000000" + (bignum)222222 + (bignum)33333000000000000 + (bignum)"990000000000000000000000";
-//     string d = (bignum)"500000000000000" * (bignum)300004000 - (bignum)"100000000000000000000000000000000000000000000000000000000000";
-//     cout << a << '\n' << b << '\n' << c << '\n' << d << endl;
+//     bignum c1("-80538738812075974");
+//     string c2 = c1;
+//     cout << c1 << "  " << c2 << endl;
 //     return 0;
 // }
