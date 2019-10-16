@@ -46,6 +46,13 @@ bignum::bignum(int64_t num){
     if(num < 0) {
         negative = true;
         num = -num;
+        if(num < 0){            // 针对 num = -9223372036854775808 的特殊情况
+            mlength = 3;
+            vlength = 19;
+            vi64 = 9223372036854775807;
+            data = new int[3]{9, 223372036, 854775808};
+            return;
+        }
     }else {
         negative = false;
     }
@@ -119,11 +126,10 @@ bignum::operator string() const {
 /*  完成到int64_t的转换
     由于这个函数存在,使得`cout`时想输出string得在前面加(string)
  */
-bignum::operator int64_t() const {
+bignum::operator int64_t() const {          // 除了 num = -9223372036854775808 时的特殊情况,正常返回
     if(!negative) return vi64;
-    if(vi64 != 9223372036854775807) return -vi64;
-    if(mlength == 3 && data[0] == 9 && data[1] == 223372036 && data[2] == 854775807) return -vi64;
-    return - vi64;
+    if(vi64 == 9223372036854775807 && mlength == 3 && data[0] == 9 && data[1] == 223372036 && data[2] == 854775808) return -vi64 - 1;
+    return -vi64;
 }
 
 bignum bignum::operator+(const bignum& num) const{          // 简单起见 只处理"正数与正数"相加
