@@ -23,6 +23,8 @@ public:
     ~bignum();
     /*explicit*/ operator int64_t() const;        // cout 时将默认以int64输出 虽然有转向string的定义 但隐式还是会只执行这个
     operator string() const;
+    // 赋值运算符
+    bignum& operator=(const bignum& num);
     // 算术运算符
     bignum operator+(const bignum& num) const;
     bignum operator-(const bignum& num) const;

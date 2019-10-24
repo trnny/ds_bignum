@@ -132,6 +132,20 @@ bignum::operator int64_t() const {          // 除了 num = -9223372036854775808
     return -vi64;
 }
 
+bignum& bignum::operator=(const bignum& num){
+    if(this == &num) return *this;      // 指针相同
+    if(*this == num) return *this;      // 值相等
+    if(NULL != data) delete[] data;
+    mlength = num.mlength;
+    negative = num.negative;
+    vlength = num.vlength;
+    vi64 = num.vi64;
+    data = new int[mlength];
+    for(int i = 0; i < mlength; i++)
+        data[i] = num.data[i];
+    return *this;
+}
+
 bignum bignum::operator+(const bignum& num) const{          // 简单起见 只处理"正数与正数"相加
     if(num.negative == negative){
         bignum res;
